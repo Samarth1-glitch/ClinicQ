@@ -1,0 +1,162 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------
+  # Stage 1 — quality gate: lint, tests, frontend build
+  # ------------------------------------------------------------------
+  test:
+    name: Test (pytest + frontend build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        working-directory: backend
+        run: ruff check .
+
+      - name: Run pytest (fails the pipeline on any test failure)
+        working-directory: backend
+        run: pytest -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build React frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+  # Terraform syntax check (no AWS credentials needed)
+  terraform-validate:
+    name: Terraform validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: init and validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  # Helm chart syntax check (no cluster needed)
+  helm-lint:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: lint and render templates
+        run: |
+          helm lint helm/clinicq
+          helm lint helm/clinicq -f helm/clinicq/values-dev.yaml
+          helm template clinicq helm/clinicq -f helm/clinicq/values-dev.yaml > /dev/null
+
+  # ------------------------------------------------------------------
+  # Stage 2 — build image, scan with Trivy, push only if the scan passes
+  # ------------------------------------------------------------------
+  build-scan-push:
+    name: Build, scan and push (${{ matrix.component }})
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image name (GHCR needs lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/clinicq-${{ matrix.component }}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image (tag = commit SHA, not latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+      - name: Trivy scan (fails on HIGH / CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Push image to GHCR
+        run: docker push "${IMAGE}:${GITHUB_SHA}"
+
+  # ------------------------------------------------------------------
+  # Stage 3 — deploy with Helm (optional: only when DEPLOY_ENABLED=true)
+  # Set repository Variables: DEPLOY_ENABLED, EKS_CLUSTER_NAME, AWS_REGION
+  # and repository Secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  # ------------------------------------------------------------------
+  deploy:
+    name: Deploy to EKS with Helm
+    needs: build-scan-push
+    if: github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - uses: azure/setup-helm@v4
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION || 'ap-south-1' }}"
+
+      - name: helm upgrade --install
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          helm upgrade --install clinicq ./helm/clinicq \
+            --namespace clinicq --create-namespace \
+            --set backend.image.repository="ghcr.io/${OWNER}/clinicq-backend" \
+            --set backend.image.tag="${GITHUB_SHA}" \
+            --set frontend.image.repository="ghcr.io/${OWNER}/clinicq-frontend" \
+            --set frontend.image.tag="${GITHUB_SHA}" \
+            --atomic --wait --timeout 5m
