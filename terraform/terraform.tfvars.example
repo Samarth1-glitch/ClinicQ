@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and adjust. NEVER put AWS access keys in this file —
+# credentials come from `aws configure` or environment variables.
+aws_region          = "ap-south-1"
+project_name        = "clinicq"
+cluster_name        = "clinicq-eks"
+kubernetes_version  = "1.34"
+node_capacity_type  = "SPOT" # use "ON_DEMAND" if you want zero interruption risk
+node_desired_size   = 2
