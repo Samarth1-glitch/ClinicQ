@@ -238,7 +238,7 @@ Make a few visible changes of your own: your clinic name and colours, one extra 
 | Symptom | Fix |
 |---|---|
 | `docker compose up --build` cannot resolve Docker Hub (`failed to resolve source metadata`, `no such host`) | Confirm the host can resolve `registry-1.docker.io` and reach port 443. In Docker Desktop, check **Settings → Proxies**: configure the HTTPS proxy required by your network, or disable a stale proxy if direct access is expected. Restart Docker Desktop and retry. If the host works but Docker still cannot resolve the registry, check VPN/firewall and Docker Desktop DNS settings; use a DNS resolver permitted by your network. |
-| Trivy fails with HIGH/CRITICAL | Upgrade the affected Python dependency or base-image OS packages (the frontend image refreshes Alpine packages during build), then rerun the scan |
+| Trivy fails with HIGH/CRITICAL | Upgrade the affected Python dependency or packaging tools (including `setuptools`/`wheel` metadata findings), or refresh base-image OS packages; then rerun the scan |
 | Trivy "TOOMANYREQUESTS" downloading its DB | Re-run the job; it is a transient rate limit |
 | PowerShell says `kind` is not recognized | Install it with `winget install Kubernetes.kind`, reopen PowerShell, and check `Get-Command kind` |
 | Pods `ImagePullBackOff` on kind | Re-run `kind load docker-image …` and use `values-dev.yaml` |
