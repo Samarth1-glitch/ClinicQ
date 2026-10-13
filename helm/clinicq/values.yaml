@@ -1,12 +1,12 @@
 # Default values. CI overrides the image repositories and tags (tag = git commit SHA).
-# Replace OWNER with your lowercase GitHub username/org.
+# Replace with your lowercase GitHub username/org.
 
 imagePullSecrets: []   # not needed if you make the GHCR packages public
 
 backend:
   replicaCount: 2
   image:
-    repository: ghcr.io/OWNER/clinicq-backend
+    repository: ghcr.io/samarth1-glitch/clinicq-backend
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -18,7 +18,7 @@ backend:
 frontend:
   replicaCount: 2
   image:
-    repository: ghcr.io/OWNER/clinicq-frontend
+    repository: ghcr.io/samarth1-glitch/clinicq-frontend
     tag: latest
     pullPolicy: IfNotPresent
   service:
