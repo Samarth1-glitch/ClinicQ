@@ -1,0 +1,39 @@
+# Lab 2 — Service with no endpoints (label mismatch)
+# Apply:   kubectl apply -f troubleshooting/broken-service.yaml
+# Observe: kubectl get pods -n clinicq --show-labels
+#          kubectl get svc,endpoints -n clinicq broken-service
+#          kubectl describe svc broken-service -n clinicq
+# Fix:     kubectl patch svc broken-service -n clinicq -p '{"spec":{"selector":{"app":"broken-service"}}}'
+# Clean:   kubectl delete -f troubleshooting/broken-service.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-service
+  namespace: clinicq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-service
+  template:
+    metadata:
+      labels:
+        app: broken-service
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-service
+  namespace: clinicq
+spec:
+  selector:
+    app: broken-servce   # <- typo on purpose: matches no Pod, so ENDPOINTS stays <none>
+  ports:
+    - port: 80
+      targetPort: 8080

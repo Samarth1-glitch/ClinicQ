@@ -1,0 +1,27 @@
+# Lab 1 — ImagePullBackOff
+# Apply:   kubectl apply -f troubleshooting/broken-image.yaml
+# Observe: kubectl get pods -n clinicq
+#          kubectl describe pod -n clinicq -l app=broken-image
+#          kubectl get events -n clinicq --sort-by=.lastTimestamp
+# Fix:     kubectl set image deployment/broken-image web=nginxinc/nginx-unprivileged:1.27-alpine -n clinicq
+# Clean:   kubectl delete -f troubleshooting/broken-image.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-image
+  namespace: clinicq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-image
+  template:
+    metadata:
+      labels:
+        app: broken-image
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:9.9.9-does-not-exist   # <- wrong tag on purpose
+          ports:
+            - containerPort: 8080
