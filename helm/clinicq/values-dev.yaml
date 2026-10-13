@@ -1,0 +1,22 @@
+# Local development values (kind / minikube): http://clinicq.local via the NGINX ingress controller.
+# Images are loaded straight into the cluster, so don't try to pull them.
+
+backend:
+  image:
+    repository: clinicq-backend
+    tag: local
+    pullPolicy: Never
+
+frontend:
+  image:
+    repository: clinicq-frontend
+    tag: local
+    pullPolicy: Never
+
+ingress:
+  enabled: true
+  className: nginx
+  host: clinicq.local
+
+serviceMonitor:
+  enabled: true

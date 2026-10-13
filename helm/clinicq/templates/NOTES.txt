@@ -1,0 +1,13 @@
+ClinicQ has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Check it:
+  kubectl get pods,svc,ingress,hpa -n {{ .Release.Namespace }}
+
+{{- if .Values.ingress.host }}
+
+Open http://{{ .Values.ingress.host }}  (add "127.0.0.1 {{ .Values.ingress.host }}" to your hosts file for kind/minikube)
+{{- else }}
+
+Find the Ingress address with:
+  kubectl get ingress -n {{ .Release.Namespace }}
+{{- end }}
