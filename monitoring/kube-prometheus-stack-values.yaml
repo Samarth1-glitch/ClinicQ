@@ -1,0 +1,33 @@
+# Values for the kube-prometheus-stack Helm chart (Prometheus + Grafana + kube-state-metrics).
+#
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace -f monitoring/kube-prometheus-stack-values.yaml
+
+prometheus:
+  prometheusSpec:
+    # Scrape every ServiceMonitor in the cluster, not only ones labelled for this release
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    retention: 6h
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+
+alertmanager:
+  enabled: false   # not needed for the demo, saves resources
+
+grafana:
+  adminPassword: clinicq-admin   # demo only
+  service:
+    type: ClusterIP
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL   # picks up monitoring/dashboard-configmap.yaml automatically
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
