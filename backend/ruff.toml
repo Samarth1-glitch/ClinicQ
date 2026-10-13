@@ -1,0 +1,7 @@
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "B"]
+# FastAPI dependency injection relies on Depends()/Query() in defaults
+ignore = ["B008"]
