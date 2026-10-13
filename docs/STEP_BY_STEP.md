@@ -136,16 +136,16 @@ Rough cost in `ap-south-1` while it is running (check the AWS Pricing Calculator
 |---|---|
 | EKS control plane | ~$0.10 / hour |
 | NAT gateway | ~$0.05 / hour + data |
-| 2 × t3.medium **Spot** nodes | ~$0.04 / hour total |
+| 2 × t3.small **Spot** nodes | Check current regional pricing; Spot rates vary |
 | Load balancer (for Ingress) | ~$0.025 / hour |
-| **Total** | **≈ $0.25–0.35 per hour → about $1 for a 3-hour session** |
+| **Total** | **Varies by usage and current regional pricing; estimate with the AWS Pricing Calculator before applying** |
 
 **Ways to pay nothing or close to it**
 - Create a new AWS account and look at **Billing → Credits**: AWS has been giving new accounts promotional
   credits. Check what your account shows and which services they cover; I can't verify current terms.
 - Ask your instructor/college about **AWS Academy / AWS Educate** or student credits. Learner-lab style
   sandboxes can restrict IAM roles, so confirm EKS works there before relying on it.
-- If neither applies, the one-session plan below costs roughly the price of a coffee.
+- If neither applies, review the current estimate and confirm who will cover it before creating resources.
 
 ### The one-session plan
 

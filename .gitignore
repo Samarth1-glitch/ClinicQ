@@ -22,6 +22,8 @@ frontend/dist/
 *.tfstate.*
 *.tfvars
 !terraform.tfvars.example
+*.tfplan
+tfplan
 crash.log
 
 # editors / OS

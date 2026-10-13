@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
-    && pip install --upgrade setuptools "wheel>=0.46.2"
+    && pip install --upgrade setuptools "wheel>=0.46.2" "urllib3==2.8.0"
 
 COPY alembic.ini .
 COPY alembic ./alembic
