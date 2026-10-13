@@ -9,6 +9,9 @@ RUN npm run build
 # ---- Stage 2: serve the static files with unprivileged Nginx ----
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
+USER root
+RUN apk upgrade --no-cache
+
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
