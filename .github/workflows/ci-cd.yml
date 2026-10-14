@@ -114,14 +114,18 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
 
+      # Runs the official Trivy image directly (pinned version) instead of a third-party
+      # action, so the pipeline does not depend on that action's tags.
       - name: Trivy scan (fails on HIGH / CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.75.0 image \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --no-progress \
+            "${IMAGE}:${GITHUB_SHA}"
 
       - name: Push image to GHCR
         run: docker push "${IMAGE}:${GITHUB_SHA}"
