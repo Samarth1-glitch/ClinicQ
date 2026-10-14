@@ -35,7 +35,7 @@ postgres:
   persistence:
     enabled: true
     size: 1Gi
-    storageClass: ""               # empty = cluster default
+    storageClass: gp2              # explicit: EKS has no default StorageClass unless you annotate one
   resources:
     requests: { cpu: 100m, memory: 128Mi }
     limits: { cpu: 500m, memory: 512Mi }
