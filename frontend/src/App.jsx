@@ -357,7 +357,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <p className="sidebar-foot">Appointments &amp; live queue</p>
+        <p className="sidebar-foot">Less waiting, better care</p>
       </aside>
 
       <main className="main">

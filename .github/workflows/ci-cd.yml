@@ -115,7 +115,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
 
       - name: Trivy scan (fails on HIGH / CRITICAL)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ github.sha }}
           format: table
@@ -127,30 +127,62 @@ jobs:
         run: docker push "${IMAGE}:${GITHUB_SHA}"
 
   # ------------------------------------------------------------------
-  # Stage 3 — deploy with Helm (optional: only when DEPLOY_ENABLED=true)
-  # Set repository Variables: DEPLOY_ENABLED, EKS_CLUSTER_NAME, AWS_REGION
-  # and repository Secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  # Stage 3 — deploy to EKS with Helm (skipped unless DEPLOY_ENABLED=true)
+  #
+  # Repository Variables:  DEPLOY_ENABLED=true, EKS_CLUSTER_NAME, AWS_REGION,
+  #                        SERVICE_MONITOR_ENABLED (optional, "true" once Prometheus is installed)
+  # Repository Secrets:    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  # The job installs ingress-nginx and metrics-server if they are missing, then deploys
+  # the images that were just built (tag = this commit's SHA).
   # ------------------------------------------------------------------
   deploy:
     name: Deploy to EKS with Helm
     needs: build-scan-push
     if: github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-eks
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+      CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'clinicq-eks' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check deployment configuration
+        env:
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          missing=0
+          [ -n "$AWS_KEY" ]    || { echo "::error::Secret AWS_ACCESS_KEY_ID is not set"; missing=1; }
+          [ -n "$AWS_SECRET" ] || { echo "::error::Secret AWS_SECRET_ACCESS_KEY is not set"; missing=1; }
+          exit $missing
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: azure/setup-helm@v4
 
       - name: Configure kubectl
-        run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION || 'ap-south-1' }}"
+        run: |
+          aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl get nodes
 
-      - name: helm upgrade --install
+      - name: Ensure ingress-nginx and metrics-server are installed
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx --create-namespace --wait --timeout 10m
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+            --namespace kube-system --wait --timeout 5m
+
+      - name: helm upgrade --install clinicq
         run: |
           OWNER="${GITHUB_REPOSITORY_OWNER,,}"
           helm upgrade --install clinicq ./helm/clinicq \
@@ -159,4 +191,13 @@ jobs:
             --set backend.image.tag="${GITHUB_SHA}" \
             --set frontend.image.repository="ghcr.io/${OWNER}/clinicq-frontend" \
             --set frontend.image.tag="${GITHUB_SHA}" \
-            --atomic --wait --timeout 5m
+            --set serviceMonitor.enabled=${{ vars.SERVICE_MONITOR_ENABLED || 'false' }} \
+            --atomic --wait --timeout 10m
+
+      - name: Show deployment status
+        run: |
+          kubectl get pods,svc,ingress,hpa -n clinicq
+          helm list -n clinicq
+          echo "Application address (may take a few minutes to start resolving):"
+          kubectl get svc ingress-nginx-controller -n ingress-nginx \
+            -o jsonpath='http://{.status.loadBalancer.ingress[0].hostname}{"\n"}'
