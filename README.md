@@ -21,6 +21,8 @@ A clinic appointment and live-queue app, taken from a git commit to a monitored 
 
 ### [▶ Watch the demo video](docs/demo.mp4) &nbsp;·&nbsp; [📑 Open the presentation](docs/ClinicQ-Capstone.pptx)
 
+### Demo video drive link: https://drive.google.com/file/d/1OhGJRrE8jf2ZaDKGQGwuGlCoDEdm_h23/view?usp=sharing
+
 </div>
 
 ---
